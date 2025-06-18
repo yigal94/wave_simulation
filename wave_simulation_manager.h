@@ -11,12 +11,25 @@ class WaveSimulationManager {
     Medium host_medium, device_medium;
     WaveSnapshotRecorder recorder;
 
-    int num_steps;
+    GridConfig grid_config;
+    RecordingConfig recording_config;
     int slice_z;
 
-    WaveSimulationManager(int steps, int slice_z);
-    void setup(const PhysicalProperties& inner, const PhysicalProperties& outer,
-               size_t inner_block_size);
+    WaveSimulationManager(const GridConfig& grid, const RecordingConfig& rec);
+    template <typename Func>
+    void setup(const MaterialConfig& material, const ExcitationConfig& excitation,
+               Func&& is_inner) {
+        host_state.allocate_host(grid_config);
+        host_state.initialize(grid_config);
+        host_state.excite(excitation.power, excitation.offset, grid_config);
+        host_medium.allocate_host(grid_config);
+        host_medium.initialize(material.inner, material.outer, std::forward<Func>(is_inner),
+                               grid_config);
+        host_state.move_to_device(device_state, grid_config);
+        host_medium.move_to_device(device_medium, grid_config);
+        recorder.set_sample_point(recording_config.sample_x, recording_config.sample_y,
+                                  recording_config.sample_z);
+    }
     void run();
 };
 

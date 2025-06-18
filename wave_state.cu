@@ -12,15 +12,15 @@ WaveState::~WaveState() {
     }
 }
 
-void WaveState::allocate_host() {
-    size_t size = Resolution * Resolution * Resolution;
+void WaveState::allocate_host(const GridConfig& grid) {
+    size_t size = grid.size_x * grid.size_y * grid.size_z;
     CUDA_CHECK(cudaMallocHost(&wave, sizeof(float) * size));
     CUDA_CHECK(cudaMallocHost(&wave_prev, sizeof(float) * size));
     CUDA_CHECK(cudaMallocHost(&wave_next, sizeof(float) * size));
 }
 
-void WaveState::allocate_device() {
-    size_t size = Resolution * Resolution * Resolution;
+void WaveState::allocate_device(const GridConfig& grid) {
+    size_t size = grid.size_x * grid.size_y * grid.size_z;
     CUDA_CHECK(cudaMalloc(&wave, sizeof(float) * size));
     CUDA_CHECK(cudaMalloc(&wave_prev, sizeof(float) * size));
     CUDA_CHECK(cudaMalloc(&wave_next, sizeof(float) * size));
@@ -40,16 +40,16 @@ void WaveState::free_device() {
     wave = wave_prev = wave_next = nullptr;
 }
 
-void WaveState::initialize() {
-    size_t size = Resolution * Resolution * Resolution;
+void WaveState::initialize(const GridConfig& grid) {
+    size_t size = grid.size_x * grid.size_y * grid.size_z;
     std::memset(wave, 0, sizeof(float) * size);
     std::memset(wave_prev, 0, sizeof(float) * size);
 }
 
-void WaveState::move_to_device(WaveState& device_state) const {
+void WaveState::move_to_device(WaveState& device_state, const GridConfig& grid) const {
     device_state.is_device = true;
-    device_state.allocate_device();
-    size_t size = Resolution * Resolution * Resolution;
+    device_state.allocate_device(grid);
+    size_t size = grid.size_x * grid.size_y * grid.size_z;
     CUDA_CHECK(cudaMemcpy(device_state.wave, wave, sizeof(float) * size, cudaMemcpyHostToDevice));
     CUDA_CHECK(cudaMemcpy(device_state.wave_prev, wave_prev, sizeof(float) * size,
                           cudaMemcpyHostToDevice));
@@ -64,13 +64,12 @@ void WaveState::set_for_next_step() {
     wave_next = temp;
 }
 
-void WaveState::excite(float power, int3 offset) {
-    int center_x = static_cast<int>(Resolution) / 2 + offset.x;
-    int center_y = static_cast<int>(Resolution) / 2 + offset.y;
-    int center_z = static_cast<int>(Resolution) / 2 + offset.z;
-    if (center_x >= 0 && center_x < static_cast<int>(Resolution) && center_y >= 0 &&
-        center_y < static_cast<int>(Resolution) && center_z >= 0 &&
-        center_z < static_cast<int>(Resolution)) {
-        wave[center_x + center_y * Resolution + center_z * Resolution * Resolution] = power;
+void WaveState::excite(float power, int3 offset, const GridConfig& grid) {
+    int center_x = grid.size_x / 2 + offset.x;
+    int center_y = grid.size_y / 2 + offset.y;
+    int center_z = grid.size_z / 2 + offset.z;
+    if (center_x >= 0 && center_x < grid.size_x && center_y >= 0 && center_y < grid.size_y &&
+        center_z >= 0 && center_z < grid.size_z) {
+        wave[center_x + center_y * grid.size_x + center_z * grid.size_x * grid.size_y] = power;
     }
 }

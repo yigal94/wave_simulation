@@ -3,41 +3,29 @@
 #include "simulation.h"
 #include "wave_simulation_manager.h"
 
-WaveSimulationManager::WaveSimulationManager(int steps, int slice_z)
-    : num_steps(steps), slice_z(slice_z) {}
-
-void WaveSimulationManager::setup(const PhysicalProperties& inner, const PhysicalProperties& outer,
-                                  size_t inner_block_size) {
-    host_state.allocate_host();
-    host_state.initialize();
-    host_state.excite(100.0f, {-10, 32, 0});
-    host_medium.allocate_host();
-    host_medium.initialize(inner, outer, inner_block_size);
-    host_state.move_to_device(device_state);
-    host_medium.move_to_device(device_medium);
-}
+WaveSimulationManager::WaveSimulationManager(const GridConfig& grid, const RecordingConfig& rec)
+    : recorder(grid), grid_config(grid), recording_config(rec) {}
 
 void WaveSimulationManager::run() {
-    constexpr size_t block_size = TileVolume;
-    dim3 block(TileX, TileY, block_size / (TileX * TileY));
-    dim3 grid(Resolution / TileX, Resolution / TileY, Resolution / TileZ);
-    for (int step = 0; step < num_steps; ++step) {
+    dim3 block(grid_config.tile_x, grid_config.tile_y, grid_config.tile_z);
+    dim3 grid_dim(grid_config.size_x / grid_config.tile_x, grid_config.size_y / grid_config.tile_y,
+                  grid_config.size_z / grid_config.tile_z);
+    for (int step = 0; step < grid_config.num_steps; ++step) {
         advance_wave_kernel_launcher(device_state.wave, device_state.wave_prev,
-                                     device_state.wave_next, device_medium.props, Resolution,
-                                     Resolution, Resolution, grid, block);
-        if (step % 25 == 0) {
-            // Copy slice from device to host and record
-            CUDA_CHECK(cudaMemcpy(host_state.wave, device_state.wave,
-                                  sizeof(float) * Resolution * Resolution * Resolution,
-                                  cudaMemcpyDeviceToHost));
-            recorder.record_slice(host_state, slice_z);
+                                     device_state.wave_next, device_medium.props, grid_config,
+                                     grid_dim, block);
+        // Sample the point every step
+        recorder.record_point_from_device(device_state.wave);
+        if (step % recording_config.slice_sample_interval == 0) {
+            // Record z-slice every N steps
+            recorder.record_slice_from_device(device_state.wave, recording_config.slice_z);
         }
         device_state.set_for_next_step();
         if (step % 100 == 0) {
             printf("Step %d completed.\n", step);
         }
     }
-    CUDA_CHECK(cudaMemcpy(host_state.wave, device_state.wave,
-                          sizeof(float) * Resolution * Resolution * Resolution,
-                          cudaMemcpyDeviceToHost));
+    // Optionally record final state
+    recorder.record_slice_from_device(device_state.wave, recording_config.slice_z);
+    recorder.record_point_from_device(device_state.wave);
 }

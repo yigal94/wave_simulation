@@ -15,8 +15,8 @@ set_target_properties(hello PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 
 # Optimization flags
 if (CMAKE_CUDA_COMPILER)
-    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -O3 -g -lineinfo")
+    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -O3 -g -lineinfo --std=c++17")
 endif()
 if (CMAKE_CXX_COMPILER)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -g")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -g --std=c++17")
 endif()
