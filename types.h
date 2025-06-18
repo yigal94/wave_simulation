@@ -3,7 +3,7 @@
 
 #include <cstddef>
 
-constexpr size_t Resolution = 256;
+constexpr size_t Resolution = 192;
 constexpr size_t TileVolume = 1024;
 constexpr size_t TileX = 16;
 constexpr size_t TileY = 16;

@@ -1,5 +1,6 @@
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 #include <sstream>
 
 #include "wave_snapshot_recorder.h"
@@ -38,6 +39,7 @@ void WaveSnapshotRecorder::save_all_to_dir(const std::string& dir) const {
         std::ostringstream fname;
         fname << dir << "/slice_step_" << i << ".csv";
         std::ofstream out(fname.str());
+        // std::cout << "Saving snapshot to: " << fname.str() << std::endl;
         const auto& slice = snapshots[i];
         for (size_t y = 0; y < Resolution; ++y) {
             for (size_t x = 0; x < Resolution; ++x) {

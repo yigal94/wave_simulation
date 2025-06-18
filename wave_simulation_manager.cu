@@ -10,7 +10,7 @@ void WaveSimulationManager::setup(const PhysicalProperties& inner, const Physica
                                   size_t inner_block_size) {
     host_state.allocate_host();
     host_state.initialize();
-    host_state.excite(100.0f);
+    host_state.excite(100.0f, {-10, 32, 0});
     host_medium.allocate_host();
     host_medium.initialize(inner, outer, inner_block_size);
     host_state.move_to_device(device_state);
@@ -25,7 +25,7 @@ void WaveSimulationManager::run() {
         advance_wave_kernel_launcher(device_state.wave, device_state.wave_prev,
                                      device_state.wave_next, device_medium.props, Resolution,
                                      Resolution, Resolution, grid, block);
-        if (step % 10 == 0) {
+        if (step % 25 == 0) {
             // Copy slice from device to host and record
             CUDA_CHECK(cudaMemcpy(host_state.wave, device_state.wave,
                                   sizeof(float) * Resolution * Resolution * Resolution,

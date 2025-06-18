@@ -9,9 +9,9 @@ int main(int argc, char** argv) {
     if (!std::filesystem::exists(out_dir)) {
         std::filesystem::create_directories(out_dir);
     }
-    PhysicalProperties inner{0.01f, 0.0001f};
-    PhysicalProperties outer{0.001f, 0.0002f};
-    int num_steps = 500;
+    PhysicalProperties inner{0.3f, 0.001f};
+    PhysicalProperties outer{0.03f, 0.003f};
+    int num_steps = 5000;
     int slice_z = Resolution / 2;
     size_t inner_block_size = Resolution / 2;
     WaveSimulationManager sim(num_steps, slice_z);

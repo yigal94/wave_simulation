@@ -65,8 +65,12 @@ void WaveState::set_for_next_step() {
 }
 
 void WaveState::excite(float power, int3 offset) {
-    size_t center_x = Resolution / 2 + offset.x;
-    size_t center_y = Resolution / 2 + offset.y;
-    size_t center_z = Resolution / 2 + offset.z;
-    wave[center_x + center_y * Resolution + center_z * Resolution * Resolution] = power;
+    int center_x = static_cast<int>(Resolution) / 2 + offset.x;
+    int center_y = static_cast<int>(Resolution) / 2 + offset.y;
+    int center_z = static_cast<int>(Resolution) / 2 + offset.z;
+    if (center_x >= 0 && center_x < static_cast<int>(Resolution) && center_y >= 0 &&
+        center_y < static_cast<int>(Resolution) && center_z >= 0 &&
+        center_z < static_cast<int>(Resolution)) {
+        wave[center_x + center_y * Resolution + center_z * Resolution * Resolution] = power;
+    }
 }
