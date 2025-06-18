@@ -5,7 +5,7 @@
 #include "wave_simulation_manager.h"
 
 SimulationConfig make_default_preset(const std::string& out_dir) {
-    GridConfig grid_config{192, 192, 192, 8, 8, 8, 4000};
+    GridConfig grid_config{256, 256, 256, 8, 8, 8, 44100};
     MaterialConfig material_config{{0.3f, 0.00001f}, {0.03f, 0.0001f}};
     ExcitationConfig excitation_config{100.0f, {-10, 9, 0}};
     RecordingConfig recording_config{grid_config.size_x / 8,

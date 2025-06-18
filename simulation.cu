@@ -30,7 +30,7 @@ __device__ void load_ghost_cells(float (&wave_tile)[TILE_X + 2][TILE_Y + 2][TILE
             int adj_x = tile_x + dx, adj_y = tile_y + dy, adj_z = tile_z + dz;
             if (adj_x >= 0 && adj_x < size_x && adj_y >= 0 && adj_y < size_y && adj_z >= 0 &&
                 adj_z < size_z) {
-                size_t adj_index = adj_x * size_y * size_z + adj_y * size_z + adj_z;
+                size_t adj_index = adj_x + adj_y * size_x + adj_z * size_x * size_y;
                 wave_tile[x_thread + 1 + dx][y_thread + 1 + dy][z_thread + 1 + dz] =
                     wave[adj_index];
                 wave_prev_tile[x_thread + 1 + dx][y_thread + 1 + dy][z_thread + 1 + dz] =
@@ -52,7 +52,7 @@ __global__ void advance_wave_kernel(const float* wave, const float* wave_prev, f
     size_t tile_z_idx = z_block * z_dim + z_thread;
     __shared__ float wave_tile[TILE_X + 2][TILE_Y + 2][TILE_Z + 2];
     __shared__ float wave_prev_tile[TILE_X + 2][TILE_Y + 2][TILE_Z + 2];
-    size_t my_index = tile_x_idx * size_y * size_z + tile_y_idx * size_z + tile_z_idx;
+    size_t my_index = tile_x_idx + tile_y_idx * size_x + tile_z_idx * size_x * size_y;
     if (tile_x_idx < size_x && tile_y_idx < size_y && tile_z_idx < size_z) {
         wave_tile[x_thread + 1][y_thread + 1][z_thread + 1] = wave[my_index];
         wave_prev_tile[x_thread + 1][y_thread + 1][z_thread + 1] = wave_prev[my_index];
