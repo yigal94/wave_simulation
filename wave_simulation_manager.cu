@@ -1,5 +1,6 @@
 #include <cmath>
 #include <cstdio>
+#include <ctime>
 
 #include "simulation.h"
 #include "wave_simulation_manager.h"
@@ -25,6 +26,8 @@ void WaveSimulationManager::run() {
         if (snapshot_steps.empty() || step > snapshot_steps.back()) snapshot_steps.push_back(step);
     }
     size_t next_snapshot_idx = 0;
+    // --- ETA timing ---
+    double start_time = clock();
     for (int step = 0; step < total_steps; ++step) {
         advance_wave_kernel_launcher(device_state.wave, device_state.wave_prev,
                                      device_state.wave_next, device_medium.props, grid_config,
@@ -40,7 +43,15 @@ void WaveSimulationManager::run() {
         }
         device_state.set_for_next_step();
         if (step % 100 == 0) {
-            printf("Step %d completed. Snapshots taken: %d\n", step, snapshots_taken);
+            double elapsed = (clock() - start_time) / CLOCKS_PER_SEC;
+            double eta = (step > 0) ? elapsed * (total_steps - step) / step : 0.0;
+            int eta_min = (int)(eta / 60);
+            int eta_sec = (int)(eta) % 60;
+            double rate = (step > 0 && elapsed > 0) ? step / elapsed : 0.0;
+            printf(
+                "Step %d completed. Snapshots taken: %d | Elapsed: %.1fs | ETA: %dm %ds | Rate: "
+                "%.2f steps/s\n",
+                step, snapshots_taken, elapsed, eta_min, eta_sec, rate);
         }
     }
     // Optionally record final state

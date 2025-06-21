@@ -15,8 +15,8 @@ __device__ __forceinline__ bool is_boundary(int thread, int dim, int tile, int s
 // Use template parameters for tile sizes, set at launch time
 
 template <int TILE_X, int TILE_Y, int TILE_Z>
-__device__ void load_ghost_cells(float (&wave_tile)[TILE_X + 2][TILE_Y + 2][TILE_Z + 2],
-                                 float (&wave_prev_tile)[TILE_X + 2][TILE_Y + 2][TILE_Z + 2],
+__device__ void load_ghost_cells(float (&wave_tile)[TILE_Z + 2][TILE_Y + 2][TILE_X + 2],
+                                 float (&wave_prev_tile)[TILE_Z + 2][TILE_Y + 2][TILE_X + 2],
                                  const float* wave, const float* wave_prev, int tile_x, int tile_y,
                                  int tile_z, int x_thread, int y_thread, int z_thread, int size_x,
                                  int size_y, int size_z) {
@@ -31,10 +31,10 @@ __device__ void load_ghost_cells(float (&wave_tile)[TILE_X + 2][TILE_Y + 2][TILE
             if (adj_x >= 0 && adj_x < size_x && adj_y >= 0 && adj_y < size_y && adj_z >= 0 &&
                 adj_z < size_z) {
                 size_t adj_index = adj_x + adj_y * size_x + adj_z * size_x * size_y;
-                wave_tile[x_thread + 1 + dx][y_thread + 1 + dy][z_thread + 1 + dz] =
-                    wave[adj_index];
-                wave_prev_tile[x_thread + 1 + dx][y_thread + 1 + dy][z_thread + 1 + dz] =
-                    wave_prev[adj_index];
+                wave_tile[adj_z - tile_z + z_thread + 1][adj_y - tile_y + y_thread + 1]
+                         [adj_x - tile_x + x_thread + 1] = wave[adj_index];
+                wave_prev_tile[adj_z - tile_z + z_thread + 1][adj_y - tile_y + y_thread + 1]
+                              [adj_x - tile_x + x_thread + 1] = wave_prev[adj_index];
             }
         }
     }
@@ -50,12 +50,12 @@ __global__ void advance_wave_kernel(const float* wave, const float* wave_prev, f
     size_t tile_x_idx = x_block * x_dim + x_thread;
     size_t tile_y_idx = y_block * y_dim + y_thread;
     size_t tile_z_idx = z_block * z_dim + z_thread;
-    __shared__ float wave_tile[TILE_X + 2][TILE_Y + 2][TILE_Z + 2];
-    __shared__ float wave_prev_tile[TILE_X + 2][TILE_Y + 2][TILE_Z + 2];
+    __shared__ float wave_tile[TILE_Z + 2][TILE_Y + 2][TILE_X + 2];
+    __shared__ float wave_prev_tile[TILE_Z + 2][TILE_Y + 2][TILE_X + 2];
     size_t my_index = tile_x_idx + tile_y_idx * size_x + tile_z_idx * size_x * size_y;
     if (tile_x_idx < size_x && tile_y_idx < size_y && tile_z_idx < size_z) {
-        wave_tile[x_thread + 1][y_thread + 1][z_thread + 1] = wave[my_index];
-        wave_prev_tile[x_thread + 1][y_thread + 1][z_thread + 1] = wave_prev[my_index];
+        wave_tile[z_thread + 1][y_thread + 1][x_thread + 1] = wave[my_index];
+        wave_prev_tile[z_thread + 1][y_thread + 1][x_thread + 1] = wave_prev[my_index];
     }
     load_ghost_cells<TILE_X, TILE_Y, TILE_Z>(wave_tile, wave_prev_tile, wave, wave_prev, tile_x_idx,
                                              tile_y_idx, tile_z_idx, x_thread, y_thread, z_thread,
@@ -66,16 +66,16 @@ __global__ void advance_wave_kernel(const float* wave, const float* wave_prev, f
         tile_y_idx == size_y - 1 || tile_z_idx == 0 || tile_z_idx == size_z - 1) {
         wave_next[my_index] = 0.0f;
     } else if (tile_x_idx < size_x && tile_y_idx < size_y && tile_z_idx < size_z) {
-        float laplacian = (wave_tile[x_thread + 2][y_thread + 1][z_thread + 1] +
-                           wave_tile[x_thread][y_thread + 1][z_thread + 1] +
-                           wave_tile[x_thread + 1][y_thread + 2][z_thread + 1] +
-                           wave_tile[x_thread + 1][y_thread][z_thread + 1] +
-                           wave_tile[x_thread + 1][y_thread + 1][z_thread + 2] +
-                           wave_tile[x_thread + 1][y_thread + 1][z_thread] -
-                           6.0f * wave_tile[x_thread + 1][y_thread + 1][z_thread + 1]) /
+        float laplacian = (wave_tile[z_thread + 1][y_thread + 1][x_thread + 2] +
+                           wave_tile[z_thread + 1][y_thread + 1][x_thread] +
+                           wave_tile[z_thread + 1][y_thread + 2][x_thread + 1] +
+                           wave_tile[z_thread + 1][y_thread][x_thread + 1] +
+                           wave_tile[z_thread + 2][y_thread + 1][x_thread + 1] +
+                           wave_tile[z_thread][y_thread + 1][x_thread + 1] -
+                           6.0f * wave_tile[z_thread + 1][y_thread + 1][x_thread + 1]) /
                           (dx * dx);
-        float u_curr = wave_tile[x_thread + 1][y_thread + 1][z_thread + 1];
-        float u_prev = wave_prev_tile[x_thread + 1][y_thread + 1][z_thread + 1];
+        float u_curr = wave_tile[z_thread + 1][y_thread + 1][x_thread + 1];
+        float u_prev = wave_prev_tile[z_thread + 1][y_thread + 1][x_thread + 1];
         float c2 = props_local.speed_of_sound * props_local.speed_of_sound;
         float damping = props_local.damping_factor;
         // Discrete wave equation with SI units
