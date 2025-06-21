@@ -21,10 +21,10 @@ class WaveSimulationManager {
                Func&& is_inner) {
         host_state.allocate_host(grid_config);
         host_state.initialize(grid_config);
-        host_state.excite(excitation.power, excitation.offset, grid_config);
+        host_state.excite(excitation, grid_config);
         host_medium.allocate_host(grid_config);
-        host_medium.initialize(material.inner, material.outer, std::forward<Func>(is_inner),
-                               grid_config);
+        // Use new unified initialization: inner > absorbing > outer
+        host_medium.initialize(material, std::forward<Func>(is_inner), grid_config);
         host_state.move_to_device(device_state, grid_config);
         host_medium.move_to_device(device_medium, grid_config);
         recorder.set_sample_point(recording_config.sample_x, recording_config.sample_y,

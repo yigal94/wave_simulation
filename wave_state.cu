@@ -64,12 +64,44 @@ void WaveState::set_for_next_step() {
     wave_next = temp;
 }
 
-void WaveState::excite(float power, int3 offset, const GridConfig& grid) {
-    int center_x = grid.size_x / 2 + offset.x;
-    int center_y = grid.size_y / 2 + offset.y;
-    int center_z = grid.size_z / 2 + offset.z;
-    if (center_x >= 0 && center_x < grid.size_x && center_y >= 0 && center_y < grid.size_y &&
-        center_z >= 0 && center_z < grid.size_z) {
-        wave[center_x + center_y * grid.size_x + center_z * grid.size_x * grid.size_y] = power;
+void WaveState::excite(const ExcitationConfig& excitation, const GridConfig& grid) {
+    // Center in grid
+    int center_x = grid.size_x / 2 + excitation.offset.x;
+    int center_y = grid.size_y / 2 + excitation.offset.y;
+    int center_z = grid.size_z / 2 + excitation.offset.z;
+    float width = excitation.width > 0 ? excitation.width : grid.dx;  // meters
+    int radius_grid = std::max(1, static_cast<int>(10 * width / grid.dx + 0.5f));
+    for (int z = center_z - radius_grid; z <= center_z + radius_grid; ++z) {
+        for (int y = center_y - radius_grid; y <= center_y + radius_grid; ++y) {
+            for (int x = center_x - radius_grid; x <= center_x + radius_grid; ++x) {
+                if (x < 0 || x >= grid.size_x || y < 0 || y >= grid.size_y || z < 0 ||
+                    z >= grid.size_z)
+                    continue;
+                float dx = (x - center_x) * grid.dx;
+                float dy = (y - center_y) * grid.dx;
+                float dz = (z - center_z) * grid.dx;
+                float r2 = dx * dx + dy * dy + dz * dz;
+                float value = 0.0f;
+                switch (excitation.shape) {
+                    case ExcitationShape::Point:
+                        if (x == center_x && y == center_y && z == center_z)
+                            value = excitation.power;
+                        break;
+                    case ExcitationShape::Sphere:
+                        if (r2 <= width * width) value = excitation.power;
+                        break;
+                    case ExcitationShape::Gaussian:
+                        value = excitation.power * expf(-r2 / (2.0f * width * width));
+                        break;
+                    case ExcitationShape::Cube:
+                        value = excitation.power;
+                        break;
+                }
+                if (value != 0.0f) {
+                    wave[x + y * grid.size_x + z * grid.size_x * grid.size_y] = value;
+                    wave_prev[x + y * grid.size_x + z * grid.size_x * grid.size_y] = value;
+                }
+            }
+        }
     }
 }

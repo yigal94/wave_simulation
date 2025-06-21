@@ -43,7 +43,7 @@ __device__ void load_ghost_cells(float (&wave_tile)[TILE_X + 2][TILE_Y + 2][TILE
 template <int TILE_X, int TILE_Y, int TILE_Z>
 __global__ void advance_wave_kernel(const float* wave, const float* wave_prev, float* wave_next,
                                     const PhysicalProperties* props, int size_x, int size_y,
-                                    int size_z) {
+                                    int size_z, float dx, float dt) {
     auto [x_block, y_block, z_block] = blockIdx;
     auto [x_thread, y_thread, z_thread] = threadIdx;
     auto [x_dim, y_dim, z_dim] = blockDim;
@@ -66,19 +66,21 @@ __global__ void advance_wave_kernel(const float* wave, const float* wave_prev, f
         tile_y_idx == size_y - 1 || tile_z_idx == 0 || tile_z_idx == size_z - 1) {
         wave_next[my_index] = 0.0f;
     } else if (tile_x_idx < size_x && tile_y_idx < size_y && tile_z_idx < size_z) {
-        float laplacian = wave_tile[x_thread + 2][y_thread + 1][z_thread + 1] +
-                          wave_tile[x_thread][y_thread + 1][z_thread + 1] +
-                          wave_tile[x_thread + 1][y_thread + 2][z_thread + 1] +
-                          wave_tile[x_thread + 1][y_thread][z_thread + 1] +
-                          wave_tile[x_thread + 1][y_thread + 1][z_thread + 2] +
-                          wave_tile[x_thread + 1][y_thread + 1][z_thread] -
-                          6.0f * wave_tile[x_thread + 1][y_thread + 1][z_thread + 1];
+        float laplacian = (wave_tile[x_thread + 2][y_thread + 1][z_thread + 1] +
+                           wave_tile[x_thread][y_thread + 1][z_thread + 1] +
+                           wave_tile[x_thread + 1][y_thread + 2][z_thread + 1] +
+                           wave_tile[x_thread + 1][y_thread][z_thread + 1] +
+                           wave_tile[x_thread + 1][y_thread + 1][z_thread + 2] +
+                           wave_tile[x_thread + 1][y_thread + 1][z_thread] -
+                           6.0f * wave_tile[x_thread + 1][y_thread + 1][z_thread + 1]) /
+                          (dx * dx);
         float u_curr = wave_tile[x_thread + 1][y_thread + 1][z_thread + 1];
         float u_prev = wave_prev_tile[x_thread + 1][y_thread + 1][z_thread + 1];
         float c2 = props_local.speed_of_sound * props_local.speed_of_sound;
         float damping = props_local.damping_factor;
-        wave_next[my_index] =
-            (2.0f - damping) * u_curr - (1.0f - damping) * u_prev + c2 * laplacian;
+        // Discrete wave equation with SI units
+        wave_next[my_index] = (2.0f - damping * dt) * u_curr - (1.0f - damping * dt) * u_prev +
+                              c2 * dt * dt * laplacian;
     }
 }
 
@@ -87,9 +89,9 @@ void advance_wave_kernel_launcher(const float* wave, const float* wave_prev, flo
                                   dim3 grid, dim3 block) {
     switch (grid_config.tile_x) {
         case 8:
-            advance_wave_kernel<8, 8, 8><<<grid, block>>>(wave, wave_prev, wave_next, props,
-                                                          grid_config.size_x, grid_config.size_y,
-                                                          grid_config.size_z);
+            advance_wave_kernel<8, 8, 8><<<grid, block>>>(
+                wave, wave_prev, wave_next, props, grid_config.size_x, grid_config.size_y,
+                grid_config.size_z, grid_config.dx, grid_config.dt);
             break;
         // Add more cases for other tile sizes as needed
         default:

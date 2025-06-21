@@ -21,7 +21,7 @@ class WaveState {
     void initialize(const GridConfig& grid);
     void move_to_device(WaveState& device_state, const GridConfig& grid) const;
     void set_for_next_step();
-    void excite(float power, int3 offset, const GridConfig& grid);
+    void excite(const ExcitationConfig& excitation, const GridConfig& grid);
 };
 
 #endif  // WAVE_STATE_H
